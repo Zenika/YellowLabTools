@@ -46,8 +46,6 @@ if (cli.input.length < 1) {
 }
 
 var input = cli.input[0];
-debug(input)
-console.log(input)
 const urls = [];
 if(input && typeof input === 'string' && (input.toLowerCase().indexOf('.yml', input.length - 4) !== -1 || input.toLowerCase().indexOf('.yaml', input.length - 5) !== -1)){
     const actions = YAML.load(input)
