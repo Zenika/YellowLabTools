@@ -5,8 +5,7 @@ var meow        = require('meow');
 var path        = require('path');
 var EasyXml     = require('easyxml');
 var Q           = require('q');
-var fs          = require('fs');
-var {parse}     = require('yaml')
+var YAML        = require('yamljs')
 
 var ylt         = require('../lib/index');
 var influxdb    = require('../lib/tools/influxdb');
@@ -47,10 +46,11 @@ if (cli.input.length < 1) {
 }
 
 var input = cli.input[0];
+debug(input)
+console.log(input)
 const urls = [];
 if(input && typeof input === 'string' && (input.toLowerCase().indexOf('.yml', input.length - 4) !== -1 || input.toLowerCase().indexOf('.yaml', input.length - 5) !== -1)){
-    const fileBuffer = fs.readFileSync(input)
-    const actions = parse(fileBuffer.toString())
+    const actions = YAML.load(input)
     urls.push(...actions.map(action => {
         return {
             url: action.url,
