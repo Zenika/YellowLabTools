@@ -1,4 +1,4 @@
-FROM    node:12-alpine
+FROM    node:16-alpine
 
 # last commit=v1.12.0
 ENV     VERSION=develop
