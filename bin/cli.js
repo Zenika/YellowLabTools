@@ -8,6 +8,7 @@ var Q           = require('q');
 var YAML        = require('yamljs');
 
 var ylt         = require('../lib/index');
+var influxdb    = require('../lib/tools/influxdb');
 
 var cli = meow({
     help: [
@@ -25,10 +26,15 @@ var cli = meow({
         '  --block-domain       Disallow requests to given (comma-separated) domains.',
         '  --allow-domain       Only allow requests to given (comma-separated) domains.',
         '  --no-externals       Block all domains except the main one.',
-        '  --reporter           The output format: "json" or "xml". Default is "json".',
+        '  --reporter           The output format: "json", "xml" or "influxdb". Default is "json".',
         '  --local-storage      Ability to set a local storage, key-value pairs (e.g. "bar=foo;domain=url")',
         '  --session-storage    Ability to set a session storage, key-value pairs (e.g. "bar=foo;domain=url")',
-        ''
+        '  --indfluxdb-hostname With influxdb as reporter, set influxdb hostname (default to influx)',
+        '  --indfluxdb-port     With influxdb as reporter, set influxdb port (default to 8086)',
+        '  --indfluxdb-org      With influxdb as reporter, set influxdb org (mandatory with influxdb as reporter)',
+        '  --indfluxdb-token    With influxdb as reporter, set influxdb token (mandatory with influxdb as reporter)',
+        '  --indfluxdb-bucket   With influxdb as reporter, set influxdb bucket (mandatory with influxdb as reporter)',
+        '  --indfluxdb-offenders   With influxdb as reporter, if set generate a json report with offenders',
     ].join('\n'),
     pkg: require('../package.json')
 });
@@ -99,18 +105,40 @@ function checkOptions(source){
     options.localStorage = source.localStorage;
     options.sessionStorage = source.sessionStorage;
 
-    // Output format
-    if (source.reporter && source.reporter !== 'json' && source.reporter !== 'xml') {
-        console.error('Incorrect parameters: reporter has to be "json" or "xml"');
-        process.exit(1);
-    }
     return options;
 }
 
 const globalOptions = checkOptions(cli.flags);
+// Output format can only be set once
+if(cli.flags.reporter && cli.flags.reporter === "influxdb"){
+    if(!cli.flags.influxdbOrg){
+        console.log('Missing parameters: influxdb-org');
+        process.exit(1);
+    }
+    else if(!cli.flags.influxdbToken){
+        console.log('Missing parameters: influxdb-token');
+        process.exit(1);
+    }
+    else if(!cli.flags.influxdbBucket){
+        console.log('Missing parameters: influxdb-bucket');
+        process.exit(1);
+    }
+    globalOptions.influxdb = {
+        hostname: cli.flags.influxdbHostname || "influxdb",
+        port: parseInt(cli.flags.influxdbPort) || 8086,
+        org: cli.flags.influxdbOrg,
+        token: cli.flags.influxdbToken,
+        bucket: cli.flags.influxdbBucket,
+        offendersReport: !!cli.flags.influxdbOffenders
+    };
+}
+else if (cli.flags.reporter && cli.flags.reporter !== 'json' && cli.flags.reporter !== 'xml') {
+    console.error('Incorrect parameters: reporter has to be "json", "xml" or "influxdb"');
+    process.exit(1);
+}
 
 // Display data
-function display(results) {
+function display(results, options) {
     switch(cli.flags.reporter) {
         case 'xml':
             var serializer = new EasyXml({
@@ -138,6 +166,9 @@ function display(results) {
 
             console.log(xmlOutput);
             break;
+        case "influxdb":
+            influxdb(results, options);
+            break;
         default:
             console.log(JSON.stringify(results, null, 2));
     }
@@ -156,7 +187,7 @@ function display(results) {
         }, Q([]))
         .then(results => {
             debug("All urls have been tested");
-            display(results);
+            display(results, options);
         })
         .fail(err => {
             debug("Error while testing urls");
